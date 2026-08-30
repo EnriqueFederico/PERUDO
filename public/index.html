@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pijudo Online</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ---------- PANTALLA: INICIO ---------- -->
+<section id="screen-home" class="screen active">
+  <div class="card">
+    <h1>🎲 Pijudo</h1>
+    <p class="subtitle">El clásico juego de dados con cubilete. Jugá con amigos, sin cuentas.</p>
+
+    <label class="field">
+      <span>Tu nombre</span>
+      <input id="input-name" type="text" maxlength="20" placeholder="¿Cómo te llamás?" />
+    </label>
+
+    <div class="home-actions">
+      <button id="btn-create" class="btn btn-primary">Crear sala</button>
+
+      <div class="join-row">
+        <input id="input-code" type="text" maxlength="4" placeholder="CÓDIGO" class="code-input" />
+        <button id="btn-join" class="btn btn-secondary">Unirse</button>
+      </div>
+    </div>
+    <p id="home-error" class="error-text"></p>
+  </div>
+</section>
+
+<!-- ---------- PANTALLA: SALA / JUEGO ---------- -->
+<section id="screen-room" class="screen">
+  <header class="room-header">
+    <div class="room-code-box">
+      Código de sala: <strong id="room-code-display">----</strong>
+      <button id="btn-copy-code" class="btn-icon" title="Copiar código">📋</button>
+    </div>
+    <button id="btn-leave" class="btn btn-ghost">Salir</button>
+  </header>
+
+  <main class="room-main">
+    <!-- Columna izquierda: jugadores -->
+    <aside class="players-panel">
+      <h3>Jugadores</h3>
+      <ul id="players-list" class="players-list"></ul>
+
+      <div id="pregame-panel" class="pregame-panel">
+        <p class="hint">Esperando a que el anfitrión empiece la partida...</p>
+        <button id="btn-start" class="btn btn-primary" style="display:none;">Empezar partida</button>
+      </div>
+    </aside>
+
+    <!-- Centro: mesa de juego -->
+    <section class="table-panel">
+      <div id="palo-banner" class="palo-banner" style="display:none;">
+        🪓 Mano de palo: sin Pijudos comodín, solo se puede subir cantidad
+      </div>
+
+      <div class="turn-info">
+        <span id="turn-indicator">—</span>
+      </div>
+
+      <div class="current-bet-display" id="current-bet-display">
+        <span class="bet-empty">Sin apuestas todavía</span>
+      </div>
+
+      <div class="my-dice-panel">
+        <h4>Tu cubilete</h4>
+        <div id="my-dice" class="dice-row"></div>
+      </div>
+
+      <div id="bet-controls" class="bet-controls" style="display:none;">
+        <div class="bet-selectors">
+          <label>
+            Cantidad
+            <input type="number" id="bet-qty" min="1" value="1" />
+          </label>
+          <label>
+            Valor
+            <select id="bet-value">
+              <option value="1">Pijudo (As)</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+          <button id="btn-bet" class="btn btn-primary">Apostar</button>
+        </div>
+        <div class="action-buttons">
+          <button id="btn-doubt" class="btn btn-danger" style="display:none;">Desconfío</button>
+          <button id="btn-calzo" class="btn btn-warning" style="display:none;">¡Hay justo!</button>
+        </div>
+      </div>
+
+      <div id="waiting-turn" class="waiting-turn" style="display:none;">
+        Esperando el turno de <strong id="waiting-name"></strong>...
+      </div>
+
+      <div id="round-result" class="round-result" style="display:none;"></div>
+
+      <div id="game-over-banner" class="game-over-banner" style="display:none;"></div>
+    </section>
+
+    <!-- Derecha: chat -->
+    <aside class="chat-panel">
+      <h3>Chat de la sala</h3>
+      <div id="chat-messages" class="chat-messages"></div>
+      <form id="chat-form" class="chat-form">
+        <input id="chat-input" type="text" maxlength="500" placeholder="Escribí un mensaje..." autocomplete="off" />
+        <button type="submit" class="btn btn-secondary">Enviar</button>
+      </form>
+    </aside>
+  </main>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
+</body>
+</html>
