@@ -68,7 +68,12 @@
       </div>
 
       <div class="my-dice-panel">
-        <h4>Tu cubilete</h4>
+        <div class="my-dice-header">
+          <h4>Tu cubilete</h4>
+          <button id="btn-toggle-dice" class="btn-eye" type="button" title="Mostrar/ocultar tus dados">
+            <span id="eye-icon">👁️</span> <span id="eye-label">Ver mis dados</span>
+          </button>
+        </div>
         <div id="my-dice" class="dice-row"></div>
       </div>
 
@@ -91,6 +96,7 @@
           </label>
           <button id="btn-bet" class="btn btn-primary">Apostar</button>
         </div>
+        <p id="bet-hint" class="bet-hint"></p>
         <div class="action-buttons">
           <button id="btn-doubt" class="btn btn-danger" style="display:none;">Desconfío</button>
           <button id="btn-calzo" class="btn btn-warning" style="display:none;">¡Hay justo!</button>

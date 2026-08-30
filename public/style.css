@@ -176,8 +176,29 @@ input:focus, select:focus { outline: 2px solid var(--accent); }
 .bet-value-icon { color: var(--accent); }
 
 .my-dice-panel { width: 100%; }
-.my-dice-panel h4 { margin: 4px 0 10px; color: var(--text-dim); font-weight: 500; }
+.my-dice-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 4px 0 10px;
+}
+.my-dice-panel h4 { margin: 0; color: var(--text-dim); font-weight: 500; }
 .dice-row { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+
+.btn-eye {
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-eye:hover { color: var(--text); border-color: var(--text-dim); }
 
 .die {
   width: 52px;
@@ -194,6 +215,26 @@ input:focus, select:focus { outline: 2px solid var(--accent); }
 }
 .die.pijudo { background: #e0a527; color: #201a08; box-shadow: 0 3px 0 #ad7d16, 0 4px 6px rgba(0,0,0,0.4); }
 .die.gone { visibility: hidden; }
+.die.hidden-die {
+  background: repeating-linear-gradient(135deg, #2b2f38, #2b2f38 6px, #323744 6px, #323744 12px);
+  color: transparent;
+  box-shadow: 0 3px 0 #14161a, 0 4px 6px rgba(0,0,0,0.4);
+  position: relative;
+}
+.die.hidden-die::after {
+  content: "🎲";
+  position: absolute;
+  font-size: 1.3rem;
+  opacity: 0.5;
+}
+
+.bet-hint {
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-align: left;
+  margin: -6px 0 0;
+  min-height: 1.1em;
+}
 
 .bet-controls { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 14px; }
 .bet-selectors { display: flex; gap: 10px; align-items: flex-end; }

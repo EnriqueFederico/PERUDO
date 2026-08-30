@@ -7,6 +7,7 @@
   let currentRoomCode = null;
   let lastState = null;
   let myDice = [];
+  let diceHidden = true;
 
   // ---------- Helpers DOM ----------
   const $ = (sel) => document.querySelector(sel);
@@ -75,18 +76,26 @@
     renderState(state);
   }
 
-  // Try auto-rejoin if we have stored credentials
-  (function tryAutoRejoin() {
+  // Re-sincroniza la identidad del jugador con el servidor en cada conexión
+  // del socket (carga inicial de la página Y cualquier reconexión automática
+  // por hipo de red, notebook suspendida, celular bloqueado, etc.). Sin esto,
+  // el socket se reconecta a nivel de transporte pero el servidor no sabe a
+  // qué jugador/sala pertenece esa nueva conexión.
+  socket.on('connect', () => {
     const savedCode = localStorage.getItem('pijudo_roomCode');
-    if (savedCode && myPlayerId && myName) {
-      socket.emit('joinRoom', { code: savedCode, name: myName, playerId: myPlayerId }, (res) => {
+    const savedPlayerId = localStorage.getItem('pijudo_playerId');
+    const savedName = localStorage.getItem('pijudo_name');
+    if (savedCode && savedPlayerId && savedName) {
+      socket.emit('joinRoom', { code: savedCode, name: savedName, playerId: savedPlayerId }, (res) => {
         if (res && res.ok) {
+          myPlayerId = savedPlayerId;
+          myName = savedName;
           currentRoomCode = res.code;
           enterRoom(res.state);
         }
       });
     }
-  })();
+  });
 
   // ---------- Room screen: leave / copy ----------
   $('#btn-leave').addEventListener('click', () => {
@@ -115,6 +124,15 @@
     const value = parseInt(betValue.value, 10);
     if (!qty || qty < 1) return;
     socket.emit('placeBet', { qty, value });
+  });
+
+  $('#btn-toggle-dice').addEventListener('click', () => {
+    diceHidden = !diceHidden;
+    renderMyDice();
+  });
+
+  betValue.addEventListener('change', () => {
+    updateBetHint();
   });
 
   $('#btn-doubt').addEventListener('click', () => {
@@ -167,6 +185,7 @@
 
   socket.on('yourDice', ({ dice }) => {
     myDice = dice;
+    diceHidden = true; // por privacidad, cada ronda nueva arranca oculta
     renderMyDice();
   });
 
@@ -269,16 +288,10 @@
       const hasBet = !!state.currentBet;
       btnDoubt.style.display = hasBet && state.currentBet.byId !== myPlayerId ? 'inline-block' : 'none';
       btnCalzo.style.display = hasBet ? 'inline-block' : 'none';
-      // sensible default for qty field
-      if (state.currentBet) {
-        const min = minNextQty(state.currentBet, state.paloRound);
-        betQty.min = min;
-        if (parseInt(betQty.value, 10) < min) betQty.value = min;
-      } else {
-        betQty.min = 1;
-      }
+      updateBetHint();
     } else {
       betControls.style.display = 'none';
+      $('#bet-hint').textContent = '';
       const cur = state.players.find((p) => p.id === state.currentPlayerId);
       waitingTurn.style.display = state.started ? 'block' : 'none';
       $('#waiting-name').textContent = cur ? cur.name : '';
@@ -305,9 +318,41 @@
     }
   }
 
-  function minNextQty(bet, paloRound) {
-    if (paloRound) return bet.qty + 1;
-    return 1; // real minimum depends on chosen value; server validates anyway
+  // Espejo de Room.isValidBet / la lógica del servidor: mínima cantidad legal
+  // para apostar `newValue` dado el estado actual de la ronda.
+  function minQtyFor(oldBet, paloRound, newValue) {
+    if (!oldBet) return 1;
+    if (paloRound) return oldBet.qty + 1;
+    if (newValue === 1 && oldBet.value !== 1) return Math.ceil(oldBet.qty / 2);
+    if (newValue === 1 && oldBet.value === 1) return oldBet.qty + 1;
+    if (newValue !== 1 && oldBet.value === 1) return oldBet.qty * 2 + 1;
+    if (newValue > oldBet.value) return oldBet.qty;
+    return oldBet.qty + 1; // igual o menor valor: hay que subir cantidad
+  }
+
+  function updateBetHint() {
+    const hint = $('#bet-hint');
+    const state = lastState;
+    if (!state || state.currentPlayerId !== myPlayerId) return;
+    const newValue = parseInt(betValue.value, 10);
+    const min = minQtyFor(state.currentBet, state.paloRound, newValue);
+
+    betQty.min = min;
+    if (parseInt(betQty.value, 10) < min || !betQty.value) betQty.value = min;
+
+    if (!state.currentBet) {
+      hint.textContent = '';
+      return;
+    }
+    if (state.paloRound) {
+      hint.textContent = `🪓 Mano de palo: solo se puede subir cantidad. Mínimo ${min}.`;
+    } else if (newValue === 1 && state.currentBet.value !== 1) {
+      hint.textContent = `Pasar a Pijudos: mitad de ${state.currentBet.qty} redondeado hacia arriba → mínimo ${min}.`;
+    } else if (newValue !== 1 && state.currentBet.value === 1) {
+      hint.textContent = `Pasar de Pijudos a ${newValue}: mínimo ${min} (el doble + 1).`;
+    } else {
+      hint.textContent = `Mínimo para esta apuesta: ${min}.`;
+    }
   }
 
   function renderMyDice() {
@@ -318,12 +363,18 @@
       const die = document.createElement('div');
       if (d === undefined) {
         die.className = 'die gone';
+      } else if (diceHidden) {
+        die.className = 'die hidden-die';
       } else {
         die.className = 'die' + (d === 1 ? ' pijudo' : '');
         die.textContent = d;
       }
       row.appendChild(die);
     }
+    const eyeIcon = $('#eye-icon');
+    const eyeLabel = $('#eye-label');
+    eyeIcon.textContent = diceHidden ? '👁️' : '🙈';
+    eyeLabel.textContent = diceHidden ? 'Ver mis dados' : 'Ocultar mis dados';
   }
 
   function renderRoundResult(result) {
