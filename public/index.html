@@ -19,6 +19,11 @@
       <input id="input-name" type="text" maxlength="20" placeholder="¿Cómo te llamás?" />
     </label>
 
+    <div class="field">
+      <span>Elegí tu avatar</span>
+      <div id="avatar-picker" class="avatar-picker"></div>
+    </div>
+
     <div class="home-actions">
       <button id="btn-create" class="btn btn-primary">Crear sala</button>
 
@@ -61,20 +66,27 @@
 
       <div class="turn-info">
         <span id="turn-indicator">—</span>
+        <span id="next-indicator" class="next-indicator"></span>
       </div>
 
       <div class="current-bet-display" id="current-bet-display">
         <span class="bet-empty">Sin apuestas todavía</span>
       </div>
 
-      <div class="my-dice-panel">
-        <div class="my-dice-header">
-          <h4>Tu cubilete</h4>
-          <button id="btn-toggle-dice" class="btn-eye" type="button" title="Mostrar/ocultar tus dados">
-            <span id="eye-icon">👁️</span> <span id="eye-label">Ver mis dados</span>
-          </button>
+      <div id="game-table" class="game-table">
+        <div class="table-felt"></div>
+        <div id="seats" class="seats"></div>
+      </div>
+
+      <div class="my-controls">
+        <button id="btn-toggle-dice" class="btn-eye" type="button" title="Mostrar/ocultar tus dados">
+          <span id="eye-icon">👁️</span> <span id="eye-label">Ver mis dados</span>
+        </button>
+        <div class="emote-row">
+          <button class="emote-btn" data-emoji="😂" type="button" title="Reírse">😂</button>
+          <button class="emote-btn" data-emoji="😠" type="button" title="Enojarse">😠</button>
+          <button class="emote-btn" data-emoji="🖕" type="button" title="Fuck you">🖕</button>
         </div>
-        <div id="my-dice" class="dice-row"></div>
       </div>
 
       <div id="bet-controls" class="bet-controls" style="display:none;">

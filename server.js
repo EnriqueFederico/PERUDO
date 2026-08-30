@@ -16,6 +16,19 @@ const rooms = new Map();
 const MAX_DICE = 5;
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin caracteres ambiguos
 
+const ALLOWED_AVATARS = [
+  '😀', '😎', '🤠', '🥸', '🤓', '😺', '🐵', '🦊',
+  '🐸', '🐼', '🐧', '🦁', '🐯', '🐙', '👽', '🤖',
+  '🧙', '🧟', '🥷', '👑',
+];
+const ALLOWED_EMOTES = ['😂', '😠', '🖕'];
+const EMOTE_COOLDOWN_MS = 600;
+
+function sanitizeAvatar(avatar) {
+  if (typeof avatar === 'string' && ALLOWED_AVATARS.includes(avatar)) return avatar;
+  return ALLOWED_AVATARS[Math.floor(Math.random() * ALLOWED_AVATARS.length)];
+}
+
 function makeRoomCode() {
   let code;
   do {
@@ -86,10 +99,19 @@ class Room {
       .map((p) => ({
         id: p.id,
         name: p.name,
+        avatar: p.avatar,
         diceCount: p.diceCount,
         connected: p.connected,
         isHost: p.id === this.hostId,
       }));
+  }
+
+  nextPlayerAfter(playerId) {
+    const active = this.activePlayers();
+    if (active.length < 2) return null;
+    const idx = active.findIndex((p) => p.id === playerId);
+    if (idx === -1) return null;
+    return active[(idx + 1) % active.length];
   }
 
   currentPlayer() {
@@ -107,6 +129,7 @@ class Room {
       players: this.publicPlayers(),
       currentBet: this.currentBet,
       currentPlayerId: cur ? cur.id : null,
+      nextPlayerId: cur ? (this.nextPlayerAfter(cur.id) || {}).id || null : null,
       paloRound: this.paloRound,
       winnerId: this.winnerId,
       totalDiceOnTable: [...this.players.values()]
@@ -335,7 +358,7 @@ io.on('connection', (socket) => {
   socket.data.roomCode = null;
   socket.data.playerId = null;
 
-  socket.on('createRoom', ({ name, playerId }, cb) => {
+  socket.on('createRoom', ({ name, avatar, playerId }, cb) => {
     try {
       const cleanName = sanitizeName(name) || 'Jugador';
       const code = makeRoomCode();
@@ -346,11 +369,13 @@ io.on('connection', (socket) => {
       const player = {
         id,
         name: cleanName,
+        avatar: sanitizeAvatar(avatar),
         socketId: socket.id,
         connected: true,
         left: false,
         diceCount: MAX_DICE,
         dice: [],
+        lastEmoteAt: 0,
       };
       room.players.set(id, player);
       room.order.push(id);
@@ -368,7 +393,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('joinRoom', ({ code, name, playerId }, cb) => {
+  socket.on('joinRoom', ({ code, name, avatar, playerId }, cb) => {
     const room = getRoom(code);
     if (!room) return cb && cb({ ok: false, error: 'No existe una sala con ese código.' });
 
@@ -403,11 +428,13 @@ io.on('connection', (socket) => {
     const player = {
       id,
       name: cleanName,
+      avatar: sanitizeAvatar(avatar),
       socketId: socket.id,
       connected: true,
       left: false,
       diceCount: MAX_DICE,
       dice: [],
+      lastEmoteAt: 0,
     };
     room.players.set(id, player);
     room.order.push(id);
@@ -483,6 +510,18 @@ io.on('connection', (socket) => {
     room.messages.push(msg);
     if (room.messages.length > 200) room.messages.shift();
     io.to(room.code).emit('chatMessage', msg);
+  });
+
+  socket.on('emote', ({ emoji }) => {
+    const room = getRoom(socket.data.roomCode);
+    if (!room) return;
+    const player = room.players.get(socket.data.playerId);
+    if (!player || player.left) return;
+    if (!ALLOWED_EMOTES.includes(emoji)) return;
+    const now = Date.now();
+    if (now - (player.lastEmoteAt || 0) < EMOTE_COOLDOWN_MS) return;
+    player.lastEmoteAt = now;
+    io.to(room.code).emit('emote', { playerId: player.id, emoji });
   });
 
   socket.on('leaveRoom', () => {

@@ -8,6 +8,14 @@
   let lastState = null;
   let myDice = [];
   let diceHidden = true;
+  let tableReveal = null; // { byId: {playerId: [dice]}, betValue, palo }
+
+  const AVATARS = [
+    '😀', '😎', '🤠', '🥸', '🤓', '😺', '🐵', '🦊',
+    '🐸', '🐼', '🐧', '🦁', '🐯', '🐙', '👽', '🤖',
+    '🧙', '🧟', '🥷', '👑',
+  ];
+  let selectedAvatar = localStorage.getItem('pijudo_avatar') || AVATARS[Math.floor(Math.random() * AVATARS.length)];
 
   // ---------- Helpers DOM ----------
   const $ = (sel) => document.querySelector(sel);
@@ -30,6 +38,24 @@
 
   inputName.value = myName;
 
+  function renderAvatarPicker() {
+    const wrap = $('#avatar-picker');
+    wrap.innerHTML = '';
+    AVATARS.forEach((a) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'avatar-option' + (a === selectedAvatar ? ' selected' : '');
+      btn.textContent = a;
+      btn.addEventListener('click', () => {
+        selectedAvatar = a;
+        localStorage.setItem('pijudo_avatar', a);
+        renderAvatarPicker();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+  renderAvatarPicker();
+
   inputCode.addEventListener('input', () => {
     inputCode.value = inputCode.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
   });
@@ -40,7 +66,7 @@
     myName = name;
     localStorage.setItem('pijudo_name', name);
     homeError.textContent = '';
-    socket.emit('createRoom', { name, playerId: myPlayerId }, handleJoinResponse);
+    socket.emit('createRoom', { name, avatar: selectedAvatar, playerId: myPlayerId }, handleJoinResponse);
   });
 
   $('#btn-join').addEventListener('click', () => {
@@ -51,7 +77,7 @@
     myName = name;
     localStorage.setItem('pijudo_name', name);
     homeError.textContent = '';
-    socket.emit('joinRoom', { code, name, playerId: myPlayerId }, handleJoinResponse);
+    socket.emit('joinRoom', { code, name, avatar: selectedAvatar, playerId: myPlayerId }, handleJoinResponse);
   });
 
   function showHomeError(msg) {
@@ -134,6 +160,28 @@
   betValue.addEventListener('change', () => {
     updateBetHint();
   });
+
+  document.querySelectorAll('.emote-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      socket.emit('emote', { emoji: btn.dataset.emoji });
+      if (myPlayerId) showEmoteBubble(myPlayerId, btn.dataset.emoji);
+    });
+  });
+
+  socket.on('emote', ({ playerId, emoji }) => {
+    if (playerId === myPlayerId) return; // ya la mostramos al instante localmente
+    showEmoteBubble(playerId, emoji);
+  });
+
+  function showEmoteBubble(playerId, emoji) {
+    const seat = document.getElementById('seat-' + playerId);
+    if (!seat) return;
+    const bubble = document.createElement('div');
+    bubble.className = 'emote-bubble';
+    bubble.textContent = emoji;
+    seat.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 1800);
+  }
 
   $('#btn-doubt').addEventListener('click', () => {
     socket.emit('doubt');
@@ -259,11 +307,15 @@
 
     // Turn indicator
     const turnIndicator = $('#turn-indicator');
+    const nextIndicator = $('#next-indicator');
     if (state.started) {
       const cur = state.players.find((p) => p.id === state.currentPlayerId);
       turnIndicator.textContent = cur ? `Turno de ${cur.id === myPlayerId ? 'vos' : cur.name}` : '';
+      const next = state.players.find((p) => p.id === state.nextPlayerId);
+      nextIndicator.textContent = next ? `→ después: ${next.id === myPlayerId ? 'vos' : next.name}` : '';
     } else {
       turnIndicator.textContent = state.winnerId ? '' : 'Esperando inicio...';
+      nextIndicator.textContent = '';
     }
 
     // Current bet
@@ -316,6 +368,8 @@
       overBanner.style.display = 'none';
       btnStart.textContent = 'Empezar partida';
     }
+
+    renderTable(state);
   }
 
   // Espejo de Room.isValidBet / la lógica del servidor: mínima cantidad legal
@@ -356,28 +410,123 @@
   }
 
   function renderMyDice() {
-    const row = $('#my-dice');
-    row.innerHTML = '';
-    for (let i = 0; i < 5; i++) {
-      const d = myDice[i];
-      const die = document.createElement('div');
-      if (d === undefined) {
-        die.className = 'die gone';
-      } else if (diceHidden) {
-        die.className = 'die hidden-die';
-      } else {
-        die.className = 'die' + (d === 1 ? ' pijudo' : '');
-        die.textContent = d;
-      }
-      row.appendChild(die);
-    }
     const eyeIcon = $('#eye-icon');
     const eyeLabel = $('#eye-label');
     eyeIcon.textContent = diceHidden ? '👁️' : '🙈';
     eyeLabel.textContent = diceHidden ? 'Ver mis dados' : 'Ocultar mis dados';
+    if (lastState) renderTable(lastState);
+  }
+
+  // ---------- Mesa con avatares y cubiletes ----------
+  function renderTable(state) {
+    const seatsEl = $('#seats');
+    if (!seatsEl) return;
+    const players = state.players || [];
+    seatsEl.innerHTML = '';
+    if (players.length === 0) return;
+
+    let myIndex = players.findIndex((p) => p.id === myPlayerId);
+    if (myIndex === -1) myIndex = 0;
+    const seatOrder = players.slice(myIndex).concat(players.slice(0, myIndex));
+    const N = seatOrder.length;
+    const rx = 44;
+    const ry = 40;
+
+    seatOrder.forEach((p, i) => {
+      const theta = Math.PI / 2 + i * ((2 * Math.PI) / N);
+      const left = 50 + rx * Math.cos(theta);
+      const top = 50 + ry * Math.sin(theta);
+
+      const seat = document.createElement('div');
+      seat.className = 'seat';
+      seat.id = 'seat-' + p.id;
+      seat.style.left = left + '%';
+      seat.style.top = top + '%';
+      if (p.id === myPlayerId) seat.classList.add('is-me');
+      if (state.started && p.id === state.currentPlayerId) seat.classList.add('is-turn');
+      if (state.started && p.id === state.nextPlayerId) seat.classList.add('is-next');
+      if (p.diceCount === 0) seat.classList.add('is-eliminated');
+      if (!p.connected) seat.classList.add('is-disconnected');
+
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = p.avatar || '🎲';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'seat-name';
+      nameEl.textContent = (p.isHost ? '★ ' : '') + p.name + (p.id === myPlayerId ? ' (vos)' : '');
+
+      const cupWrap = document.createElement('div');
+      cupWrap.className = 'cup-wrap';
+
+      const diceRow = document.createElement('div');
+      diceRow.className = 'seat-dice';
+
+      const reveal = tableReveal && tableReveal.byId[p.id];
+      let lifted = false;
+
+      if (reveal) {
+        lifted = true;
+        reveal.forEach((val) => {
+          const d = document.createElement('div');
+          const isMatch = val === tableReveal.betValue ||
+            (!tableReveal.palo && tableReveal.betValue !== 1 && val === 1);
+          d.className = 'seat-die' + (isMatch ? ' match' : '');
+          d.textContent = val;
+          diceRow.appendChild(d);
+        });
+      } else if (p.id === myPlayerId) {
+        lifted = !diceHidden && p.diceCount > 0;
+        for (let k = 0; k < p.diceCount; k++) {
+          const d = document.createElement('div');
+          if (lifted) {
+            d.className = 'seat-die' + (myDice[k] === 1 ? ' pijudo' : '');
+            d.textContent = myDice[k];
+          } else {
+            d.className = 'seat-die hidden';
+          }
+          diceRow.appendChild(d);
+        }
+      } else {
+        for (let k = 0; k < p.diceCount; k++) {
+          const d = document.createElement('div');
+          d.className = 'seat-die hidden';
+          diceRow.appendChild(d);
+        }
+      }
+
+      const cup = document.createElement('div');
+      cup.className = 'cup';
+      if (p.diceCount === 0) cup.style.display = 'none';
+
+      cupWrap.appendChild(diceRow);
+      cupWrap.appendChild(cup);
+      if (lifted && p.diceCount > 0) cupWrap.classList.add('lifted');
+
+      const diceCountEl = document.createElement('div');
+      diceCountEl.className = 'seat-dicecount';
+      diceCountEl.textContent = '🎲 ' + p.diceCount;
+
+      seat.appendChild(avatar);
+      seat.appendChild(nameEl);
+      seat.appendChild(cupWrap);
+      seat.appendChild(diceCountEl);
+      seatsEl.appendChild(seat);
+    });
   }
 
   function renderRoundResult(result) {
+    const byId = {};
+    result.detail.forEach((d) => {
+      byId[d.id] = d.dice;
+    });
+    tableReveal = { byId, betValue: result.bet.value, palo: isPaloResult(result) };
+    if (lastState) renderTable(lastState);
+    setTimeout(() => {
+      tableReveal = null;
+      if (lastState) renderTable(lastState);
+    }, 5000);
+
     const el = $('#round-result');
     el.style.display = 'block';
     const bet = result.bet;
